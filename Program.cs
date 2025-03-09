@@ -1,4 +1,5 @@
 ﻿using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 
 namespace D0004N
 {
@@ -69,7 +70,7 @@ namespace D0004N
         }
 
         /// <summary>
-        /// Registrera Station (En post i Bil kan skapas utan en relation till "BilStation", vilket betyder att en bil inte är kopplad 1:1 till en station
+        /// Registrera Station
         /// strikt enligt denna modell
         /// </summary>
         /// <returns></returns>
@@ -122,50 +123,54 @@ namespace D0004N
 
 
         /// <summary>
-        /// Exempel: Registrera en ny bil i dbo.Bil (och koppla bil till en station).
+        /// Registrera en ny bil i dbo.Bil (och koppla bil till en station).
         /// </summary>
         private static async Task RegistreraBil()
         {
             Console.WriteLine("Registrera bil.\n");
 
-            Console.Write("RegNr: ");
-            var regNr = Console.ReadLine() ?? "";
-
-            Console.Write("Biltyp (0-5): ");
-            var bilTypString = Console.ReadLine() ?? "";
-            if (!int.TryParse(bilTypString, out int bilTyp))
-            {
-                Console.WriteLine("Felaktig inmatning av Biltyp (0-5). Avbryter...");
-                return;
-            }
-
-            var success = await Transactor.NonQueryBil(regNr, bilTyp);
-            if (!success)
-            {
-                Console.WriteLine("Fel vid registrering av bil (INSERT).");
-                return;
-            }
-
-
-            Console.Write("StationId (ex. 1): ");
+            Console.Write("StationId: ");
             var stationIdStr = Console.ReadLine() ?? "";
             if (!int.TryParse(stationIdStr, out int stationId))
             {
                 Console.WriteLine("Felaktig inmatning av StationID. Avbryter...");
+                Console.ReadKey();
                 return;
             }
 
-            success = await Transactor.NonQueryBilStation(regNr, stationId);
-            if (!success)
+            Console.Write("RegNr: ");
+            var regNr = Console.ReadLine() ?? "";
+
+            Console.Write("Biltyp (0–5): ");
+            var bilTypString = Console.ReadLine() ?? "";
+            if (!int.TryParse(bilTypString, out int bilTyp))
+            {
+                Console.WriteLine("Felaktig inmatning av Biltyp (0–5). Avbryter...");
+                Console.ReadKey();
+                return;
+            }
+
+            var successStation = await Transactor.NonQueryBilStation(regNr, stationId);
+            if (!successStation)
             {
                 Console.WriteLine("Fel vid registrering av BilStation (INSERT).");
+                Console.ReadKey();
                 return;
             }
 
-            Console.WriteLine("Bilen registrerades och kopplades till station.");
+            var successBil = await Transactor.NonQueryBil(regNr, bilTyp);
+            if (!successBil)
+            {
+                Console.WriteLine("Fel vid registrering av bil (INSERT).");
+                Console.ReadKey();
+                return;
+            }
+
+            Console.WriteLine("BilStation och Bil registrerades korrekt.");
             Console.WriteLine("Tryck valfri tangent för att fortsätta...");
             Console.ReadKey();
         }
+
 
         private static async Task RegistreraPersonal()
         {
@@ -226,71 +231,132 @@ namespace D0004N
         /// </summary>
         private static async Task BokaHyrning()
         {
-            Console.WriteLine("Är det en företagskund? (J/N)");
-            var corp = Console.ReadLine()?.ToLower();
-            bool isFöretag = corp == "j";
+            Console.WriteLine("Är det en företagskund? (J/N):");
+            var input = Console.ReadLine()?.Trim().ToLower();
+            bool isFöretag = input == "j";
 
             if (isFöretag)
             {
                 Console.Write("OrgNr: ");
-                var org = Console.ReadLine() ?? "";
+                var orgNr = Console.ReadLine() ?? "";
                 Console.Write("Företagsnamn: ");
-                var fname = Console.ReadLine() ?? "";
+                var fNamn = Console.ReadLine() ?? "";
                 Console.Write("Företagsadress: ");
-                var faddr = Console.ReadLine() ?? "";
-                Console.Write("Förnamn kontaktperson: ");
-                var fn = Console.ReadLine() ?? "";
-                Console.Write("Efternamn kontaktperson: ");
-                var ln = Console.ReadLine() ?? "";
-                var ex = await Transactor.CheckIfForetagExists(org, fn, ln);
-                if (!ex)
-                {
-                    var cF = await Transactor.NonQueryForetag(org, fname, fn, ln, faddr);
-                    if (!cF) return;
-                }
-                Console.WriteLine("Skapar bokning...");
-                var bokId = await SkapaBokning();
-                if (bokId < 0) return;
+                var fAdress = Console.ReadLine() ?? "";
 
-                Console.WriteLine("Ange AnställningsId: ");
-                if  (!int.TryParse(Console.ReadLine() ?? "", out var aid))
+                var foretagExists = await Transactor.CheckIfForetagExists(orgNr);
+                if (!foretagExists)
                 {
-                    Console.WriteLine("Fel vid inmatningstolkning av anställningsid....");
+                    var createdF = await Transactor.NonQueryForetag(orgNr, fNamn, fAdress);
+                    if (!createdF)
+                    {
+                        Console.WriteLine("Fel vid registrering av Företag.");
+                        Console.ReadKey();
+                        return;
+                    }
+                }
+
+                Console.Write("Kontaktpersonens personnummer: ");
+                var pnr = Console.ReadLine() ?? "";
+
+                var kundExists = await Transactor.CheckIfKundExists(pnr);
+                if (!kundExists)
+                {
+                    Console.Write("Kontaktpersonens förnamn: ");
+                    var kFnamn = Console.ReadLine() ?? "";
+                    Console.Write("Kontaktpersonens efternamn: ");
+                    var kEnamn = Console.ReadLine() ?? "";
+                    var createdKund = await Transactor.NonQueryKund(kFnamn, kEnamn, pnr, orgNr);
+                    if (!createdKund)
+                    {
+                        Console.WriteLine("Fel vid registrering av kund.");
+                        Console.ReadKey();
+                        return;
+                    }
+                }
+
+                int kundId = await Transactor.NonQueryKunder(0, pnr);
+                if (kundId <= 0)
+                {
+                    Console.WriteLine("Fel vid skapande av Kunder-rad.");
                     Console.ReadKey();
                     return;
                 }
 
-                var avtalSuccess = await Transactor.NonQueryAvtal(aid, bokId, true, null);
-
-                if (!avtalSuccess)
+                int bokId = await SkapaBokning();
+                if (bokId <= 0)
                 {
-                    Console.WriteLine("Fel vid signering av avtal...");
+                    Console.WriteLine("Fel vid bokning.");
                     Console.ReadKey();
                     return;
                 }
 
-                var cBK = await Transactor.NonQueryBokningKund(bokId, null, org, fn, ln);
-                Console.WriteLine(cBK ? "Bokning gjord." : "Fel vid bokning.");
+                var okBK = await Transactor.NonQueryBokningKund(bokId, kundId);
+                Console.WriteLine(okBK ? "BokningKund skapad." : "Fel i BokningKund.");
+
+                Console.Write("AnställningsId för den som skriver avtal: ");
+                var anstStr = Console.ReadLine() ?? "";
+                if (!int.TryParse(anstStr, out int anstallningsId))
+                {
+                    Console.WriteLine("Felaktigt AnställningsId.");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null);
+                Console.WriteLine(avtalOk ? "Avtal signerat." : "Fel vid avtalssignering.");
                 Console.ReadKey();
             }
             else
             {
                 Console.Write("Personnummer: ");
                 var pnr = Console.ReadLine() ?? "";
-                var ex = await Transactor.CheckIfKundExists(pnr);
-                if (!ex)
+                var kundExists = await Transactor.CheckIfKundExists(pnr);
+                if (!kundExists)
                 {
                     Console.Write("Förnamn: ");
                     var fNamn = Console.ReadLine() ?? "";
                     Console.Write("Efternamn: ");
                     var eNamn = Console.ReadLine() ?? "";
-                    var cK = await Transactor.NonQueryKund(pnr, fNamn, eNamn);
-                    if (!cK) return;
+                    var createdKund = await Transactor.NonQueryKund(fNamn, eNamn, pnr, null);
+                    if (!createdKund)
+                    {
+                        Console.WriteLine("Fel vid registrering av kund.");
+                        Console.ReadKey();
+                        return;
+                    }
                 }
-                var bokId = await SkapaBokning();
-                if (bokId <= 0) return;
-                var cBK = await Transactor.NonQueryBokningKund(bokId, pnr, null, null, null);
-                Console.WriteLine(cBK ? "Bokning gjord." : "Fel vid bokning.");
+
+                int kundId = await Transactor.NonQueryKunder(0, pnr);
+                if (kundId <= 0)
+                {
+                    Console.WriteLine("Fel vid skapande av Kunder-rad.");
+                    Console.ReadKey();
+                    return;
+                }
+
+                int bokId = await SkapaBokning();
+                if (bokId <= 0)
+                {
+                    Console.WriteLine("Fel vid bokning.");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var okBK = await Transactor.NonQueryBokningKund(bokId, kundId);
+                Console.WriteLine(okBK ? "BokningKund skapad." : "Fel i BokningKund.");
+
+                Console.Write("AnställningsId för den som skriver avtal: ");
+                var anstStr = Console.ReadLine() ?? "";
+                if (!int.TryParse(anstStr, out int anstallningsId))
+                {
+                    Console.WriteLine("Felaktigt AnställningsId.");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null);
+                Console.WriteLine(avtalOk ? "Avtal signerat." : "Fel vid avtalssignering.");
                 Console.ReadKey();
             }
         }
@@ -304,12 +370,26 @@ namespace D0004N
             Console.Write("RegNr: ");
             var reg = Console.ReadLine() ?? "";
             Console.Write("Startdatum (yyyy-mm-dd): ");
-            var sd = Console.ReadLine() ?? "";
-            if (!DateTime.TryParse(sd, out var start)) return -1;
+            var startStr = Console.ReadLine() ?? "";
+            if (!DateTime.TryParse(startStr, out DateTime start))
+            {
+                Console.WriteLine("Felaktigt datumformat.");
+                return -1;
+            }
             Console.Write("Slutdatum (yyyy-mm-dd): ");
-            var ed = Console.ReadLine() ?? "";
-            if (!DateTime.TryParse(ed, out var slut)) return -1;
-            var bokId = await Transactor.NonQueryBokning(reg, start, slut);
+            var endStr = Console.ReadLine() ?? "";
+            if (!DateTime.TryParse(endStr, out DateTime slut))
+            {
+                Console.WriteLine("Felaktigt datumformat.");
+                return -1;
+            }
+
+            int bokId = await Transactor.NonQueryBokning(reg, start, slut);
+            if (bokId <= 0)
+            {
+                Console.WriteLine("Kunde ej skapa Bokning.");
+                return -1;
+            }
             return bokId;
         }
 
@@ -320,31 +400,33 @@ namespace D0004N
         private static async Task SkapaFaktura()
         {
             Console.Write("BokningsId: ");
-            var bokIdStr = Console.ReadLine() ?? "";
-            if (!int.TryParse(bokIdStr, out int bokningsId))
+            var bokStr = Console.ReadLine() ?? "";
+            if (!int.TryParse(bokStr, out int bokningsId))
             {
-                Console.WriteLine("Ogiltig BokningsID.");
-                Console.ReadKey();
+                Console.WriteLine("Felaktigt BokningsID.");
                 return;
             }
-            Console.Write("Totalt belopp: ");
+            Console.Write("Belopp: ");
             var beloppStr = Console.ReadLine() ?? "";
             if (!decimal.TryParse(beloppStr, out decimal belopp))
             {
-                Console.WriteLine("Ogiltigt belopp.");
-                Console.ReadKey();
+                Console.WriteLine("Felaktigt belopp.");
+                return;
+            }
+            Console.Write("FakturaId (ex: 1): ");
+            var fidStr = Console.ReadLine() ?? "";
+            if (!int.TryParse(fidStr, out int fakturaId))
+            {
+                Console.WriteLine("Felaktigt FakturaId.");
                 return;
             }
 
-            var fakturaSuccess = await Transactor.NonQueryFaktura(bokningsId, belopp);
-            if (!fakturaSuccess)
-            {
-                Console.WriteLine("Fel vid skapande av faktura.");
-                Console.ReadKey();
-                return;
-            }
-            Console.WriteLine("Faktura skapad!");
-            Console.WriteLine("Tryck valfri tangent för att fortsätta...");
+            DateTime datum = DateTime.Now;
+            DateTime forfDatum = datum.AddDays(30);
+            bool status = false;
+
+            var success = await Transactor.NonQueryFaktura(fakturaId, bokningsId, belopp, datum, forfDatum, status);
+            Console.WriteLine(success ? "Faktura skapad!" : "Fel vid skapande av faktura.");
             Console.ReadKey();
         }
     }
@@ -470,20 +552,21 @@ namespace D0004N
             }
         }
 
-        public static async Task<bool> NonQueryKund(string fNamn, string eNamn, string pnr)
+        public static async Task<bool> NonQueryKund(string fNamn, string eNamn, string pnr, string? orgNr)
         {
             try
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"INSERT INTO Kund (ForNamn, EfterNamn, Personnummer)
-                           VALUES (@F, @E, @P);";
+                string sql = @"INSERT INTO Kund (ForNamn, EfterNamn, Personnummer, OrgNr)
+                           VALUES (@F, @E, @P, @O);";
 
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@F", fNamn);
                 cmd.Parameters.AddWithValue("@E", eNamn);
                 cmd.Parameters.AddWithValue("@P", pnr);
+                cmd.Parameters.AddWithValue("@O", (object?)orgNr ?? DBNull.Value);
 
 
                 await cmd.ExecuteNonQueryAsync();
@@ -496,19 +579,52 @@ namespace D0004N
             return true;
         }
 
+        public static async Task<int> NonQueryKunder(int kundId, string personnummer)
+        {
+            int lastId = 0;
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+
+                string read = @"SELECT ISNULL(MAX(KundId), 0) AS MaxKundId FROM Kunder;";
+                using var cmdRead = new SqlCommand(read, conn);
+                int maxId = (int)await cmdRead.ExecuteScalarAsync();
+
+                lastId = maxId + 1;
+
+                string sql = @"INSERT INTO Kunder (KundId, Personnummer) 
+                           VALUES (@Id, @Pnr);";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@Id", lastId);
+                cmd.Parameters.AddWithValue("@Pnr", personnummer);
+ 
+
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return -1;
+            }
+            return lastId;
+        }
+
+
         // ============= FÖRETAG =============
-        public static async Task<bool> CheckIfForetagExists(string orgNr, string fornamn, string efternamn)
+        public static async Task<bool> CheckIfForetagExists(string orgNr)
         {
             try
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"SELECT COUNT(*) FROM Företag WHERE OrgNr = @O AND Efternamn = @EN AND Fornamn = @FN;";
+                string sql = @"SELECT COUNT(*) FROM Företag WHERE OrgNr = @O;";
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@O", orgNr);
-                cmd.Parameters.AddWithValue("@EN", efternamn);
-                cmd.Parameters.AddWithValue("@FN", fornamn);
 
                 int count = (int)await cmd.ExecuteScalarAsync();
                 return count > 0;
@@ -520,22 +636,20 @@ namespace D0004N
             }
         }
 
-        public static async Task<bool> NonQueryForetag(string orgNr, string namn, string fornamn, string efternamn, string adr)
+        public static async Task<bool> NonQueryForetag(string orgNr, string namn, string adr)
         {
             try
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"INSERT INTO Företag (OrgNr, FöretagsNamn, Adress, Fornamn, Efternamn)
-                           VALUES (@O, @N, @A, @FN, @EN);";
+                string sql = @"INSERT INTO Företag (OrgNr, ForetagsNamn, Adress)
+                           VALUES (@O, @N, @A);";
 
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@O", orgNr);
                 cmd.Parameters.AddWithValue("@N", namn);
                 cmd.Parameters.AddWithValue("@A", adr);
-                cmd.Parameters.AddWithValue("@FN", fornamn);
-                cmd.Parameters.AddWithValue("@EN", efternamn);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -607,7 +721,7 @@ namespace D0004N
         // ============= BOKNING =============
         public static async Task<int> NonQueryBokning(string regNr, DateTime start, DateTime slut)
         {
-            int lastId = 0; // Tvinga check constraint i DB:n att id är > 0.
+            int lastId = 0;
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -640,33 +754,26 @@ namespace D0004N
             return lastId;
         }
 
-        public static async Task<bool> NonQueryBokningKund(int bokningsId, string? pnr, string? orgNr, string? fornamn, string? efternamn)
+        public static async Task<bool> NonQueryBokningKund(int bokningsId, int kundId)
         {
+            //int lastId = 0; 
             try
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
+                //string read = @"SELECT ISNULL(MAX(KundId), 0) AS MaxKundId FROM BokningKund;";
+                //using var cmdRead = new SqlCommand(read, conn);
+                //int maxId = (int)await cmdRead.ExecuteScalarAsync();
+                //lastId = maxId + 1;
+
                 string sql = @"
-            INSERT INTO BokningKund (BokningsId, Personnummer, OrgNr, Fornamn, Efternamn)
-            VALUES (@BokId, @Pnr, @Org, @Fnamn, @Enamn);";
+            INSERT INTO BokningKund (BokningsId, KundId)
+            VALUES (@BokId, @Kid);";
 
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@BokId", bokningsId);
-
-                if (pnr == null)
-                {
-                    cmd.Parameters.AddWithValue("@Pnr", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Fnamn", fornamn);
-                    cmd.Parameters.AddWithValue("@Enamn", efternamn);
-                    cmd.Parameters.AddWithValue("@Org", orgNr);
-                }
-                else
-                {
-                    cmd.Parameters.AddWithValue("@Org", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Pnr", pnr);
-                }
-                
+                cmd.Parameters.AddWithValue("@Kid", kundId);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -680,19 +787,23 @@ namespace D0004N
 
 
         // ============= FAKTURA =============
-        public static async Task<bool> NonQueryFaktura(int bokningsId, decimal belopp)
+        public static async Task<bool> NonQueryFaktura(int FakturaId, int bokningsId, decimal belopp, DateTime datum, DateTime forfDatum, bool status)
         {
             try
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"INSERT INTO Faktura (BokningsId, Totalbelopp)
-                           VALUES (@B, @Belopp);";
+                string sql = @"INSERT INTO Faktura (FakturaId, BokningsId, FakturaDatum, Belopp, ForfalloDatum, Status)
+                           VALUES (@Fid, @Bid, @Date, @Belopp, @Fdate, @Ok);";
 
                 using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@B", bokningsId);
+                cmd.Parameters.AddWithValue("@Fid", FakturaId);
+                cmd.Parameters.AddWithValue("@Bid", bokningsId);
+                cmd.Parameters.AddWithValue("@Date", datum);
                 cmd.Parameters.AddWithValue("@Belopp", belopp);
+                cmd.Parameters.AddWithValue("@Fdate", forfDatum);
+                cmd.Parameters.AddWithValue("@Ok", status);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -713,7 +824,7 @@ namespace D0004N
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"INSERT INTO Avtal (AnställningsId, BokningsId, Status, Filepath)
+                string sql = @"INSERT INTO Avtal (AnstallningsId, BokningsId, Status, Filepath)
                        VALUES (@A, @B, @S, @F);";
 
                 using var cmd = new SqlCommand(sql, conn);
@@ -759,25 +870,26 @@ namespace D0004N
         }
 
 
+
+
     }
 
 
-
+    #region Modeller som kan användas för att läsa och skriva enligt DB-schemat
     public class Kund
     {
         public string ForNamn { get; set; } = "";
         public string EfterNamn { get; set; } = "";
         public string Personnummer { get; set; } = ""; // PK
+        public string? OrgNr { get; set; } // Optional FK
 
     }
 
-    public class Företag
+    public class Företag // dbo.Företag
     {
         public string OrgNr { get; set; } = ""; // PK
-        public string FöretagsNamn { get; set; } = "";
+        public string ForetagsNamn { get; set; } = "";
         public string Adress { get; set; } = "";
-        public string Fornamn { get; set; } = ""; // PK
-        public string EfterNamn { get; set; } = ""; // PK 
     }
 
     public class Bil
@@ -786,7 +898,7 @@ namespace D0004N
         public int BilTyp { get; set; }
     }
 
-    public class Personal // En personal är inte kopplad till en station
+    public class Personal // Denna heter "dbo.Anstalld"
     {
         public string ForNamn { get; set; } = "";
         public string EfterNamn { get; set; } = "";
@@ -806,11 +918,16 @@ namespace D0004N
         public string Adress { get; set; } = "";
     }
 
-    // En bil är ALLTID kopplad till en station (uppdateras vid inlämning till annan station).
     public class BilStation
     {
         public string RegNr { get; set; } = ""; // Composite PK [0]
         public int StationId { get; set; } // Composite PK [1]
+    }
+
+    public class Kunder
+    {
+        public int KundId { get; set; } // PK
+        public string Personnummer { get; set; } // FK -> Kund
     }
 
     public class Bokning {
@@ -822,20 +939,20 @@ namespace D0004N
 
     public class Kontroll
     {
-        public string RegNr { get; set; } = ""; // Composite PK [0]
-        public DateTime Datum { get; set; } // Composite PK [1]
-        public int AnställningsId { get; set; } // FK 
+        public int BokningsId { get; set; } // PK && FK
+        public DateTime Datum { get; set; }
+        public int AnstallningsId { get; set; } // FK 
         public bool Status { get; set; } // False = OK, True = Skada. Default False.
-        public string Dokument { get; set; } = ""; // Sökväg/länk till de facto dokumentationen.
+        public string? Filepath { get; set; } // Sökväg/länk till de facto dokumentationen.
     }
 
     public class Skada
     {
         public int SkadaId { get; set; } // PK
-        public string RegNr { get; set; } = "";  // FK -> Bil
-        public DateTime UpptäcktDatum { get; set; }
-        public string? Beskrivning { get; set; } = ""; // Valfri
-        public decimal Kostnad { get; set; }
+        public int BokningsId { get; set; } // FK -> Kontroll
+        public DateTime Datum { get; set; }
+        public string? Beskrivning { get; set; } = ""; // Valfri. 
+        public decimal? Kostnad { get; set; } // Har inte inkluderats i ERD. Do not use.
     }
 
 
@@ -844,18 +961,19 @@ namespace D0004N
         public int FakturaId { get; set; } // PK
         public int BokningsId { get; set; } // FK -> Bokning
         public DateTime Fakturadatum { get; set; } = DateTime.Now;
-        public DateTime Förfallodatum { get; set; } = DateTime.Now.AddDays(30);
-        public decimal Totalbelopp { get; set; }
+        public DateTime Forfallodatum { get; set; } = DateTime.Now.AddDays(30);
+        public decimal Belopp { get; set; } // FLOAT i SSMS. Använd denna för både Företagsfakturering samt skada-fakturering.
         public bool Status { get; set; } = false; // False = ej betald, True = Betald.
     }
 
     public class Avtal
     {
-        public int AnställningsId { get; set; }
-        public int BokningsId { get; set; }
+        public int AnstallningsId { get; set; } // FK -> Anstalld
+        public int BokningsId { get; set; } // PK, FK -> Bokning
         public bool Status { get; set; } // False, ej signerad = True = signerad.
-        public string Filepath { get; set; } = "";// Nullable attribut. Ej använd, men kan Demo:a denna i framtiden.
+        public string? Filepath { get; set; } // Nullable attribut. Ej använd, men kan Demo:a denna i framtiden.
     }
     public enum BilType { Stadsbil, Liten, Mellan, Kombi, Minibuss, Transportbil };
+    #endregion
 
 }
