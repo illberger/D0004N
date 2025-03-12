@@ -1,0 +1,29 @@
+USE [D0004N]
+GO
+
+/****** Object:  Table [dbo].[BilTyp]    Script Date: 2025-03-12 14:43:28 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[BilTyp](
+	[BilTyp] [int] NOT NULL,
+	[KrDygn] [decimal](18, 0) NOT NULL,
+	[KrDygnHelg] [decimal](18, 0) NOT NULL,
+	[Modell] [nvarchar](50) NULL,
+	[Year] [date] NULL,
+ CONSTRAINT [PK_BilTyp] PRIMARY KEY CLUSTERED 
+(
+	[BilTyp] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[BilTyp]  WITH CHECK ADD  CONSTRAINT [CK_BilTyp] CHECK  (([BilTyp]>=(0) AND [BilTyp]<(6)))
+GO
+
+ALTER TABLE [dbo].[BilTyp] CHECK CONSTRAINT [CK_BilTyp]
+GO
+

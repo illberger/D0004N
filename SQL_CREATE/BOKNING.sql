@@ -1,0 +1,29 @@
+USE [D0004N]
+GO
+
+/****** Object:  Table [dbo].[Bokning]    Script Date: 2025-03-09 23:51:47 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[Bokning](
+	[BokningsId] [int] NOT NULL,
+	[RegNr] [nchar](6) NOT NULL,
+	[StartDatum] [date] NOT NULL,
+	[SlutDatum] [date] NOT NULL,
+ CONSTRAINT [PK_Bokning] PRIMARY KEY CLUSTERED 
+(
+	[BokningsId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[Bokning]  WITH CHECK ADD  CONSTRAINT [FK_Bokning_Bil] FOREIGN KEY([RegNr])
+REFERENCES [dbo].[Bil] ([RegNr])
+GO
+
+ALTER TABLE [dbo].[Bokning] CHECK CONSTRAINT [FK_Bokning_Bil]
+GO
+

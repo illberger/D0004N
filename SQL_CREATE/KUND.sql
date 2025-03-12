@@ -1,0 +1,29 @@
+USE [D0004N]
+GO
+
+/****** Object:  Table [dbo].[Kund]    Script Date: 2025-03-12 13:46:13 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[Kund](
+	[Personnummer] [nchar](12) NOT NULL,
+	[ForNamn] [nvarchar](50) NOT NULL,
+	[EfterNamn] [nvarchar](50) NOT NULL,
+	[OrgNr] [nchar](10) NULL,
+ CONSTRAINT [PK_Kund] PRIMARY KEY CLUSTERED 
+(
+	[Personnummer] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[Kund]  WITH CHECK ADD  CONSTRAINT [FK_Kund_Företag] FOREIGN KEY([OrgNr])
+REFERENCES [dbo].[Foretag] ([OrgNr])
+GO
+
+ALTER TABLE [dbo].[Kund] CHECK CONSTRAINT [FK_Kund_Företag]
+GO
+
