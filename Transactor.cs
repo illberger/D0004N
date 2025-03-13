@@ -59,6 +59,45 @@ namespace D0004N
             return result;
         }
 
+        public static async Task<bool> QueryRegNrWithStatus(string regNr)
+        {
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string sql = @"
+            SELECT TOP 1 SlutDatum 
+            FROM BokningBil 
+            WHERE RegNr = @regnr 
+            ORDER BY BokningsId DESC;
+                ";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@regnr", regNr);
+
+                var result = await cmd.ExecuteScalarAsync();
+
+                if (result == null)
+                    return true;
+
+                if (result == DBNull.Value)
+                    return false;
+
+                DateTime slutDatum = Convert.ToDateTime(result);
+                if (slutDatum > DateTime.Now)
+                    return false;
+                else
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
+
         public static async Task<bool> NonQueryBil(string RegNr, int BilTyp)
         {
             try

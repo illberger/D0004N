@@ -443,6 +443,13 @@ namespace D0004N
                 var reg = Console.ReadLine()?.Trim();
                 if (string.IsNullOrEmpty(reg)) break;
 
+                bool avbl = await Transactor.QueryRegNrWithStatus(reg);
+                if (!avbl)
+                {
+                    Console.WriteLine($"Bil {reg} är inte tillgänglig just nu.");
+                    continue;
+                }
+
                 regNrList.Add(reg);
                 Console.WriteLine($"Bil {reg} lades till bokningen.");
             }
@@ -453,6 +460,8 @@ namespace D0004N
                 Console.ReadKey();
                 return -1;
             }
+
+
 
             bool success = await Transactor.NonQueryBokningBil(regNrList, bokId, start, slutdatum);
             if (!success)
@@ -499,8 +508,17 @@ namespace D0004N
 
             if (lopandeHyrning)
             {
-                Console.WriteLine($"Följande bilar hyrs fr.o.m {start}:\n{regNrList.ToArray()}");
-                if (regNrList.Count == 0) Console.WriteLine("Tyvärr fanns inte den/dessa bilar tillgängliga");
+                Console.WriteLine($"Följande bilar hyrs fr.o.m {start}: ");
+                if (regNrList.Count > 0)
+                {
+                    foreach (var regNr in regNrList)
+                    {
+                        Console.WriteLine($"{regNr}");
+                    }
+                } else
+                {
+                    Console.WriteLine("Tyvärr så fanns inte angivna bilar tillgängliga.");
+                }
                 Console.ReadKey();
             }
             return bokId;
