@@ -1,5 +1,7 @@
-﻿using System.Data.SqlClient;
+using System.ComponentModel.Design;
+using System.Data.SqlClient;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace D0004N
@@ -7,7 +9,7 @@ namespace D0004N
 
     /// <summary>
     /// Exempel på enkel användning av datamodellen
-    /// -Elias Töyrä
+    /// - Elias Töyrä
     /// </summary>
     public class Program
     {
@@ -18,20 +20,24 @@ namespace D0004N
             Console.ReadKey();
         }
 
+        /// <summary>
+        /// Steg 1 - 3 krävs för att hyra en bil, men constraints kan ju dubbelkollas innan detta etc genom att hyra en bil.
+        /// </summary>
+        /// <returns></returns>
         private static async Task Meny()
         {
             while (true)
             {
                 Console.Clear();
                 Console.WriteLine("Green Rental DB - Huvudmeny");
-                Console.WriteLine("Steg 1 - 3 krävs för att hyra en bil.");
+                Console.WriteLine("Kontroller och skador kan inte postas om en bil har ett slutdatum. I det scenariot skapas en faktura preliminärt.");
                 Console.WriteLine("1. Registrera bil");
                 Console.WriteLine("2. Registrera station");
                 Console.WriteLine("3. Registrera Personal");
                 Console.WriteLine("4. Visa alla bilar + status");
                 Console.WriteLine("5. Visa stationer");
                 Console.WriteLine("6. Hyr ut Bil");
-                Console.WriteLine("7. Inlämning av bil");
+                Console.WriteLine("7. Inlämning av bil samt skadekontroll.");
                 Console.WriteLine("q. Avsluta\n");
 
                 var input = Console.ReadLine()?.Trim();
@@ -260,6 +266,7 @@ namespace D0004N
             Console.WriteLine("Är det en företagskund? (J/N):");
             var input = Console.ReadLine()?.Trim().ToLower();
             bool isFöretag = input == "j";
+            int kundId = 0;
 
             if (isFöretag)
             {
@@ -299,15 +306,19 @@ namespace D0004N
                         Console.ReadKey();
                         return;
                     }
+                    kundId = await Transactor.NonQueryKunder(pnr); // --------- Skapa KundId -> INSERT
+                    if (kundId <= 0)
+                    {
+                        Console.WriteLine("Fel vid skapande av Kunder-rad.");
+                        Console.ReadKey();
+                        return;
+                    }
+                } else
+                {
+                    kundId = await Transactor.QueryKunder(pnr);
                 }
 
-                int kundId = await Transactor.NonQueryKunder(pnr); // --------- Skapa KundId -> INSERT
-                if (kundId <= 0)
-                {
-                    Console.WriteLine("Fel vid skapande av Kunder-rad.");
-                    Console.ReadKey();
-                    return;
-                }
+                
 
                 int bokId = await SkapaBokning(kundId); // ------ Skapa BoKId -> Insert
 
@@ -351,15 +362,20 @@ namespace D0004N
                         Console.ReadKey();
                         return;
                     }
+                    kundId = await Transactor.NonQueryKunder(pnr);
+                    if (kundId <= 0)
+                    {
+                        Console.WriteLine("Fel vid skapande av Kunder-rad.");
+                        Console.ReadKey();
+                        return;
+                    }
+                }
+                else
+                {
+                    kundId = await Transactor.QueryKunder(pnr);
                 }
 
-                int kundId = await Transactor.NonQueryKunder(pnr);
-                if (kundId <= 0)
-                {
-                    Console.WriteLine("Fel vid skapande av Kunder-rad.");
-                    Console.ReadKey();
-                    return;
-                }
+
 
                 int bokId = await SkapaBokning(kundId);
 
@@ -464,7 +480,7 @@ namespace D0004N
                     TimeSpan diff = slutdatum.Value - start;
                     int antalDygn = (int)diff.TotalDays;
                     DateTime tempDate = start;
-                    for (int i = 0; i < antalDygn; i++)
+                    for (int i = 0; i <= antalDygn; i++)
                     {
                         var dayOfWeek = tempDate.DayOfWeek;
                         if (dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday)
@@ -485,6 +501,7 @@ namespace D0004N
             if (lopandeHyrning)
             {
                 Console.WriteLine($"Följande bilar hyrs fr.o.m {start}:\n{regNrList.ToArray()}");
+                if (regNrList.Count == 0) Console.WriteLine("Tyvärr fanns inte den/dessa bilar tillgängliga");
                 Console.ReadKey();
             }
             return bokId;
@@ -514,6 +531,13 @@ namespace D0004N
         /// <returns></returns>
         private static async Task AvslutaHyrning()
         {
+            var kunderObject = await Transactor.QueryAllKunder();
+            Console.WriteLine("Registrerade kunder:\n");
+
+            foreach (var kunder in kunderObject)
+            {
+                Console.WriteLine($"KundId: {kunder.KundId}, Pnr: {kunder.Personnummer}\n");
+            }
             Console.Write("Ange KundID: ");
             var kundIdStr = Console.ReadLine() ?? "";
             if (!int.TryParse(kundIdStr, out int kundId))
@@ -619,17 +643,17 @@ namespace D0004N
                     continue;
                 }
 
-                TimeSpan diff = newSlut - start;
-                int antalDygn = (int)diff.TotalDays;
+                TimeSpan diff = newSlut - start; // (2025-03-13) - (2025-03-12) = TimeSpan(1)
+                int antalDygn = (int)diff.TotalDays; // (int)1
                 decimal belopp = 0;
 
-                DateTime tempDate = start;
-                for (int i = 0; i < antalDygn; i++)
+                DateTime tempDate = start; // 2025-03-12
+                for (int i = 0; i <= antalDygn; i++) // n = 1, i = 1. Z: {0 + kr ? 0.5}
                 {
                     bool helg = (tempDate.DayOfWeek == DayOfWeek.Saturday
                               || tempDate.DayOfWeek == DayOfWeek.Sunday);
-                    belopp += helg ? bilInfo.KrHelg : bilInfo.KrDygn;
-                    tempDate = tempDate.AddDays(1);
+                    belopp += helg ? bilInfo.KrHelg : bilInfo.KrDygn; // 0||1
+                    tempDate = tempDate.AddDays(1); // 2025-03-12 = 2025-03-12 + Days(1) = 2025-03-13
                 }
 
                 totalBelopp += belopp;
@@ -642,7 +666,63 @@ namespace D0004N
                 Console.ReadKey();
                 return;
             }
-            Console.WriteLine("Slutdatum uppdaterat för valda bilar.");
+
+            Console.WriteLine("Bilar inlämnade. Utför kontroll av samtliga bilar (J/N)?");
+
+
+            // ========= Skadekontroll ============
+            var kontr = Console.ReadLine()?.Trim().ToLower();
+            bool doKontr = (kontr == "j");
+            if (doKontr)
+            {
+                Console.WriteLine("Ange AnställningsId(int) för att utföra kontroll: ");
+                var anstIdInput = Console.ReadLine();
+                if (int.TryParse(anstIdInput, out int AnstId))
+                {
+                    bool anstExists = await Transactor.QueryPersonalScalar(AnstId);
+                    if (anstExists)
+                    {
+                        foreach (string reg in regNrToClose) // BokningBil  1:0..M  Kontroll
+                        {
+                            Console.Clear();
+                            Console.WriteLine($"Bil {reg}");
+                            Console.WriteLine("Skriv upp bilens mätarställning(int): ");
+                            var matarInput = Console.ReadLine().Trim();
+                            if (!int.TryParse(matarInput, out var matarst))
+                            {
+                                Console.WriteLine("Felaktig inmatning, klicka för att fortsätta.");
+                                Console.ReadKey();
+                                continue;
+                            }
+
+                            bool sxKntrQry = await Transactor.NonQueryKontroll(reg, bokId, AnstId, matarst);
+                            if (!sxKntrQry) continue;
+
+                            Console.WriteLine("Skriv in antal(int) skador: ");
+                            var skdInput = Console.ReadLine().Trim();
+                            if(!int.TryParse(skdInput, out var skd))
+                            {
+                                Console.WriteLine("Du angav 0 skador.");
+                                Console.ReadKey(); continue;
+                            }
+                            Console.WriteLine($"Du angav {skd} skador.");
+                            for (int i = 0; i < skd; i++) // Kontroll  1:0..M  Skada
+                            {
+                                int skdId = await Transactor.NonQuerySkada(reg, bokId, null, null);
+                                Console.WriteLine($"Skapade ID {skdId} för skada {reg}.");
+                            }
+                            Console.WriteLine("Klicka för att fortsätta.");
+                            Console.ReadKey();
+                        }
+                    } else
+                    {
+                        Console.WriteLine($"AnställningsID:t {AnstId} kunde ej hittas i databasen. Klicka för att fortsätta till fakturering för bilar.");
+                        Console.ReadKey();
+                    }
+                    Console.Clear();
+                }
+            }
+
 
             if (totalBelopp > 0)
             {
@@ -662,13 +742,12 @@ namespace D0004N
             }
             else
             {
-                Console.WriteLine("Ingen debitering behövs (0 kr).");
+                Console.WriteLine("Ingen debitering behövs.");
                 Console.ReadKey();
             }
 
             Console.WriteLine("Återgå till huvudmeny (click)");
             Console.ReadKey();
         }
-
     }
 }
