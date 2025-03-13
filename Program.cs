@@ -1,4 +1,3 @@
-﻿using System.ComponentModel.Design;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.Runtime.CompilerServices;
