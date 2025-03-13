@@ -35,6 +35,12 @@ namespace D0004N
             public decimal KrHelg { get; set; }
         }
 
+        public class Kunder
+        {
+            public string Personnummer { get; set; }
+            public int KundId { get; set; }
+        }
+
         public class BokningBilDto
         {
             public string RegNr { get; set; }

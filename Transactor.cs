@@ -8,6 +8,7 @@ using static D0004N.Schema;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Data;
+using System.Reflection.PortableExecutable;
 
 namespace D0004N
 {
@@ -23,19 +24,20 @@ namespace D0004N
             {
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
-                string sql = @"
-                SELECT b.RegNr, b.BilTyp,
-                    CASE 
-                    WHEN bk.BokningsId IS NOT NULL THEN 'Uthyrd'
-                    ELSE 'Tillgänglig'
-                    END AS StatusText
+                string sql = @"SELECT b.RegNr, b.BilTyp,
+                CASE 
+                WHEN bk.MaxBokningsId IS NOT NULL THEN 'Uthyrd'
+                ELSE 'Tillgänglig'
+                END AS StatusText
                 FROM Bil b
                 LEFT JOIN (
-                    SELECT BokningsId, RegNr
-                    FROM BokningBil
-                    WHERE GETDATE() >= StartDatum
-                    AND (SlutDatum IS NULL OR GETDATE() <= SlutDatum)
+                SELECT RegNr, MAX(BokningsId) AS MaxBokningsId
+                FROM BokningBil
+                WHERE GETDATE() >= StartDatum
+                AND (SlutDatum IS NULL OR GETDATE() <= SlutDatum)
+                GROUP BY RegNr
                 ) bk ON b.RegNr = bk.RegNr;
+
                 ";
 
                 using var cmd = new SqlCommand(sql, conn);
@@ -201,7 +203,7 @@ namespace D0004N
                 using var conn = new SqlConnection(DB);
                 await conn.OpenAsync();
 
-                string sql = @"SELECT COUNT(*) FROM Kund WHERE Personnummer = @Pnr;";
+                string sql = @"SELECT COUNT(*) FROM Kunder WHERE Personnummer = @Pnr;";
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add("@Pnr", SqlDbType.NChar, 12).Value = personnummer.Trim();
 
@@ -212,6 +214,36 @@ namespace D0004N
             {
                 Console.WriteLine(ex.Message);
                 return false;
+            }
+        }
+
+
+        public static async Task<List<Kunder>> QueryAllKunder()
+        {
+            var result = new List<Kunder>();
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string sql = @"SELECT * FROM Kunder;";
+                using var cmd = new SqlCommand(sql, conn);
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var Kunder = new Schema.Kunder
+                    {
+                        KundId = reader.GetInt32(reader.GetOrdinal("KundId")),
+                        Personnummer = reader.GetString(reader.GetOrdinal("Personnummer"))
+                    };
+                    result.Add(Kunder);
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return null;
             }
         }
 
@@ -275,6 +307,35 @@ namespace D0004N
             }
             return lastId;
         }
+
+        public static async Task<int> QueryKunder(string personnummer)
+        {
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string query = "SELECT KundId FROM Kunder WHERE Personnummer = @Pnr;";
+                using var cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@Pnr", personnummer);
+
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null && int.TryParse(result.ToString(), out int kundId))
+                {
+                    return kundId;
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return -1;
+            }
+        }
+
 
 
         // ============= FÖRETAG =============
@@ -649,8 +710,88 @@ namespace D0004N
             return true;
         }
 
+        public static async Task<bool> QueryPersonalScalar(int anstId)
+        {
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
 
+                string sql = @"SELECT COUNT(*) FROM Anstalld WHERE AnstallningsId = @Id;";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@Id", anstId);
 
+                int count = (int)await cmd.ExecuteScalarAsync();
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+        }
 
+        // ============= KONTROLL =================
+
+        public static async Task<bool> NonQueryKontroll(string regNr, int bokId, int anstId, int matarSt)
+        {
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string sql = @"INSERT INTO Kontroll (RegNr, BokningsId, AntallningsId, MatarStallning)
+                       VALUES (@Reg, @BId, @AId, @Mst);";
+
+                using var cmd = new SqlCommand(sql, conn);
+
+                cmd.Parameters.AddWithValue("@Reg", regNr);
+                cmd.Parameters.AddWithValue("@BId", bokId);
+                cmd.Parameters.AddWithValue("@AId", anstId);
+                cmd.Parameters.AddWithValue("@Mst", matarSt);
+
+                await cmd.ExecuteNonQueryAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.ReadKey(); // 
+                return false;
+            }
+        }
+
+        public static async Task<int> NonQuerySkada(string regNr, int bokId, DateTime? dtFixd, string? desc)
+        {
+            int lastId = 0;
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string read = @"SELECT ISNULL(MAX(SkadaId), 0) AS MaxSkadaId FROM Skada;";
+                using var cmdRead = new SqlCommand(read, conn); 
+                int maxId = (int)await cmdRead.ExecuteScalarAsync();
+                lastId = maxId + 1; 
+
+                string sql = @"INSERT INTO Skada (SkadaId, BokningsId, RegNr, DatumFixad, Beskrivning)
+                                VALUES (@SId, @BId, @Reg, @DFx, @Dsc);";  
+                using var cmd = new SqlCommand(sql, conn);    
+                
+                cmd.Parameters.AddWithValue("@SId", lastId);           
+                cmd.Parameters.AddWithValue("@BId", bokId);
+                cmd.Parameters.AddWithValue("@Reg", regNr);
+                cmd.Parameters.AddWithValue("@DFx", (object?)dtFixd ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Dsc", (object?)desc ?? DBNull.Value);
+                await cmd.ExecuteNonQueryAsync();         
+            }         
+            catch (Exception ex)              
+            {      
+                Console.WriteLine(ex.Message);                    
+                return -1;
+      
+            }
+            return lastId;   
+        }
     }
 }
