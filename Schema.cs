@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -33,6 +33,12 @@ namespace D0004N
             public int BilTypId { get; set; }
             public decimal KrDygn { get; set; }
             public decimal KrHelg { get; set; }
+        }
+
+        public class Kunder
+        {
+            public string Personnummer { get; set; }
+            public int KundId { get; set; }
         }
 
         public class BokningBilDto
