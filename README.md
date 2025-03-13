@@ -2,7 +2,7 @@
 Elias Töyrä <br>
 En simpel SQL-klient.<br><br>
 Använder OS tid för att se tillgängligheten på bilar, samt för att beräkna kostnad på fakturor etc. <br>
-Om en bil "lämnas in" i "framtiden", så kommer den fortsatt att anses vara "uthyrd" (även om en faktura har skapats)
+Om en bil "lämnas in" i "framtiden", så kommer den fortsatt att anses vara "uthyrd" tills systemtiden har passerat SlutDatumet.
 <br><br>
 Inga funktioner för kontroller eller skador etc..
 
