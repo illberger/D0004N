@@ -1,6 +1,8 @@
 # D0004N Datamodellering - Uppgift 1
-En simpel SQL-klient som stödjer hela den logiska datamodellen.<br><br>
+En simpel SQL-klient.<br><br>
 Se till att sätta upp samtliga tables och kör sedan <b>USER_RESTRICTIONS.sql</b> för att lägga till restriktioner etc. <b>PERSONAL.sql</b> skapar två poster med olika rättigheter.
+<br><br>
+Om tomma objekt returneras av <b>Transactor</b>, alternativt om SQL-undandtag kastas - BRA, det är poängen (om du gör transaktionerna som underhållspersonal etc)
 <br><br>
 Inga funktioner för extern fillagring och skapning har implementerats (samtliga <b>Filepath</b> är nullable).
 
