@@ -1,8 +1,7 @@
--- ÄNDRA DB-variablerna om du måste. Login osv är på servernivå, kopplade till en user till databasen som du skapar.
-USE [master]
+-- ÄNDRA DB-variabeln vid behov
+USE [D0004N]
 GO
 
-/*Här står lösenorden så strängarna i programmet ska fungera, fast då måste ju DB:n heta D0004N osv.*/
 CREATE LOGIN [KontrollLogin] WITH PASSWORD='Kontroll123!', DEFAULT_DATABASE=[D0004N], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=ON
 GO
 
@@ -15,8 +14,6 @@ GO
 ALTER LOGIN [AvtalLogin] DISABLE
 GO
 
-USE D0004N;
-GO
 CREATE USER KontrollUser FOR LOGIN KontrollLogin;
 CREATE USER AvtalUser FOR LOGIN AvtalLogin;
 GO
@@ -37,10 +34,10 @@ REVOKE INSERT, SELECT ON dbo.Foretag FROM KontrollUser;
 REVOKE INSERT, SELECT ON dbo.Kunder FROM KontrollUser;
 REVOKE INSERT, SELECT ON dbo.Faktura FROM KontrollUser;
 REVOKE INSERT, SELECT ON dbo.Avtal FROM KontrollUser;
-REVOKE INSERT, SELECT ON dbo.Anstalld FROM KontrollUser; /* 'Personal' */
+REVOKE INSERT, SELECT ON dbo.Anstalld FROM KontrollUser;
 REVOKE INSERT, SELECT ON dbo.BokningFaktura FROM KontrollUser;
 
--- Avtaluser (Uthyrningspersonal, antag att denna är superuser)
+-- Avtaluser (Uthyrningspersonal)
 GRANT SELECT, INSERT, UPDATE ON dbo.Kunder TO AvtalUser;
 GRANT SELECT, INSERT, UPDATE ON dbo.Kund TO AvtalUser;
 GRANT SELECT, INSERT, UPDATE ON dbo.Foretag TO AvtalUser;
