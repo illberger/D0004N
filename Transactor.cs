@@ -12,13 +12,40 @@ using System.Reflection.PortableExecutable;
 
 namespace D0004N
 {
+
+    /// <summary>
+    /// Skapa tables samt users till Databasen "D0004N" för att nyttja klassen
+    /// </summary>
     static class Transactor
     {
-        const string DB = "Server=localhost;Database=D0004N;Trusted_Connection=True;TrustServerCertificate=True";
+        /// <summary>
+        /// <b>Exempel på anslutningssträng</b>
+        /// Användare för underhållspersonal som kontrollerar bilar och skador etc.
+        /// </summary>
+        public static string ConnectionStringKontroll =
+            "Server=localhost;Database=D0004N;User Id=KontrollLogin;Password=Kontroll123!;TrustServerCertificate=True";
+
+        /// <summary>
+        /// <b>Exempel på anslutningssträng</b>
+        /// Användare för uthyrningspersonal och uppåt (max privilegium i denna modell).
+        /// </summary>
+        public static string ConnectionStringAvtal =
+            "Server=localhost;Database=D0004N;User Id=AvtalLogin;Password=Avtal123!;TrustServerCertificate=True";
+
 
         // ============= BIL =============
-        public static async Task<List<(string RegNr, int BilTyp, string StatusText)>> QueryBilWithStatus()
+        public static async Task<List<(string RegNr, int BilTyp, string StatusText)>> QueryBilWithStatus(int user)
         {
+       
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             var result = new List<(string, int, string)>();
             try
             {
@@ -59,11 +86,11 @@ namespace D0004N
             return result;
         }
 
-        public static async Task<bool> QueryRegNrWithStatus(string regNr)
+        public static async Task<bool> QueryRegNrWithStatus(string regNr, int user)
         {
             try
             {
-                using var conn = new SqlConnection(DB);
+                using var conn = new SqlConnection(ConnectionStringAvtal);
                 await conn.OpenAsync();
 
                 string sql = @"
@@ -98,8 +125,16 @@ namespace D0004N
         }
 
 
-        public static async Task<bool> NonQueryBil(string RegNr, int BilTyp)
+        public static async Task<bool> NonQueryBil(string RegNr, int BilTyp, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            } else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using (var conn = new SqlConnection(DB))
@@ -125,8 +160,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<bool> NonQueryBilStation(string regNr, int stationId)
+        public static async Task<bool> NonQueryBilStation(string regNr, int stationId, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -147,8 +191,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<bool> QueryBilTyp(int bilTyp)
+        public static async Task<bool> QueryBilTyp(int bilTyp, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -167,8 +220,17 @@ namespace D0004N
             }
         }
 
-        public static async Task<bool> NonQueryBilTyp(int bilTyp, decimal krDygn)
+        public static async Task<bool> NonQueryBilTyp(int bilTyp, decimal krDygn, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             decimal krDygnHelg = krDygn * 0.5m; // WeekendKampanj!!! :-]]]]]]]]]]]]]] $$$$$$$$$$$$$$$$$
             try
             {
@@ -193,8 +255,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<BiltypDto> QueryBiltypByRegNr(string regNr)
+        public static async Task<BiltypDto> QueryBiltypByRegNr(string regNr, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             BiltypDto result = null;
 
             try
@@ -235,8 +306,17 @@ namespace D0004N
 
 
         // ============= KUND =============
-        public static async Task<bool> CheckIfKundExists(string personnummer)
+        public static async Task<bool> CheckIfKundExists(string personnummer, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -257,8 +337,17 @@ namespace D0004N
         }
 
 
-        public static async Task<List<Kunder>> QueryAllKunder()
+        public static async Task<List<Kunder>> QueryAllKunder(int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             var result = new List<Kunder>();
             try
             {
@@ -286,8 +375,17 @@ namespace D0004N
             }
         }
 
-        public static async Task<bool> NonQueryKund(string fNamn, string eNamn, string pnr, string? orgNr)
+        public static async Task<bool> NonQueryKund(string fNamn, string eNamn, string pnr, string? orgNr, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -313,8 +411,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<int> NonQueryKunder(string personnummer)
+        public static async Task<int> NonQueryKunder(string personnummer, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             int lastId = 0;
             try
             {
@@ -347,8 +454,17 @@ namespace D0004N
             return lastId;
         }
 
-        public static async Task<int> QueryKunder(string personnummer)
+        public static async Task<int> QueryKunder(string personnummer, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -378,8 +494,17 @@ namespace D0004N
 
 
         // ============= FÖRETAG =============
-        public static async Task<bool> CheckIfForetagExists(string orgNr)
+        public static async Task<bool> CheckIfForetagExists(string orgNr, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -399,8 +524,17 @@ namespace D0004N
             }
         }
 
-        public static async Task<bool> NonQueryForetag(string orgNr, string namn, string adr)
+        public static async Task<bool> NonQueryForetag(string orgNr, string namn, string adr, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -426,8 +560,17 @@ namespace D0004N
 
         // ------------- STATION -------------
 
-        public static async Task<bool> NonQueryStation(int stationId, string adress)
+        public static async Task<bool> NonQueryStation(int stationId, string adress, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -450,8 +593,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<List<Schema.Station>> QueryStation()
+        public static async Task<List<Schema.Station>> QueryStation(int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             var result = new List<Schema.Station>();
             try
             {
@@ -489,8 +641,17 @@ namespace D0004N
         /// </summary>
         /// <param name="kundId"></param>
         /// <returns>New BokningsId</returns>
-        public static async Task<int> NonQueryBokningKund(int kundId)
+        public static async Task<int> NonQueryBokningKund(int kundId, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             int lastId = 0; 
             try
             {
@@ -527,8 +688,17 @@ namespace D0004N
         /// <param name="slut"></param>
         /// <param name="kundId"></param>
         /// <returns>OK/NO</returns>
-        public static async Task<bool> NonQueryBokningBil(List<string> regNr, int bokId, DateTime start, DateTime? slut)
+        public static async Task<bool> NonQueryBokningBil(List<string> regNr, int bokId, DateTime start, DateTime? slut, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -560,8 +730,17 @@ namespace D0004N
 
 
         // ============= FAKTURA =============
-        public static async Task<bool> NonQueryFaktura(long FakturaId, int bokningsId, decimal belopp, DateTime datum, DateTime forfDatum, bool status)
+        public static async Task<bool> NonQueryFaktura(long FakturaId, int bokningsId, decimal belopp, DateTime datum, DateTime forfDatum, bool status, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -599,8 +778,17 @@ namespace D0004N
             return true;
         }
 
-        public static async Task<List<BokningBilDto>> QueryBokningBil(int bokId)
+        public static async Task<List<BokningBilDto>> QueryBokningBil(int bokId, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             var result = new List<BokningBilDto>();
             try
             {
@@ -636,13 +824,67 @@ namespace D0004N
             return result;
         }
 
+        public static async Task<List<BokningBil>> QueryAllBokningBil(int user)
+        {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
+            var result = new List<BokningBil>();
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string sql = @"
+                            SELECT RegNr, BokningsId, StartDatum, SlutDatum
+                            FROM BokningBil;";
+
+                using var cmd = new SqlCommand(sql, conn);
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var dto = new BokningBil
+                    {
+
+                        RegNr = reader["RegNr"].ToString(),
+                        BokningsId = int.Parse(reader["BokningsId"].ToString()),
+                        StartDatum = (DateTime)reader["StartDatum"],
+                        SlutDatum = reader["SlutDatum"] == DBNull.Value
+                                    ? (DateTime?)null
+                                    : (DateTime)reader["SlutDatum"]
+                    };
+                    result.Add(dto);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return result;
+        }
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="kundId"></param>
         /// <returns>Alla BokningsID för en kund</returns>
-        public static async Task<List<int>> QueryBokningarForKund(int kundId)
+        public static async Task<List<int>> QueryBokningarForKund(int kundId, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             var result = new List<int>();
             try
             {
@@ -666,8 +908,17 @@ namespace D0004N
             return result;
         }
 
-        public static async Task<bool> UpdateSlutDatum(int bokId, List<string> regNrList, DateTime? newSlut)
+        public static async Task<bool> UpdateSlutDatum(int bokId, List<string> regNrList, DateTime? newSlut, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             if (regNrList == null || regNrList.Count == 0) return true;
 
             try
@@ -698,8 +949,17 @@ namespace D0004N
 
 
         // ============== AVTAL ===============
-        public static async Task<bool> NonQueryAvtal(int anstId, int bokId, bool? status, string? filepath)
+        public static async Task<bool> NonQueryAvtal(int anstId, int bokId, bool? status, string? filepath, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -724,33 +984,51 @@ namespace D0004N
         }
 
         // ============= PERSONAL ==============
-        public static async Task<bool> NonQueryPersonal(int anstId, string fNamn, string eNamn)
+       
+
+        public static async Task<List<Personal>> QueryAllPersonal()
         {
+            var result = new List<Schema.Personal>();
             try
             {
-                using var conn = new SqlConnection(DB);
+                using var conn = new SqlConnection(ConnectionStringAvtal); //....
                 await conn.OpenAsync();
 
-                string sql = @"INSERT INTO Anstalld (AnstallningsId, Fornamn, Efternamn)
-                       VALUES (@Id, @F, @E);";
+                string sql = "SELECT AnstallningsId, Behorighet, Fornamn, Efternamn FROM Anstalld;";
 
                 using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@Id", anstId);
-                cmd.Parameters.AddWithValue("@F", fNamn);
-                cmd.Parameters.AddWithValue("@E", eNamn);
-
-                await cmd.ExecuteNonQueryAsync();
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var station = new Schema.Personal
+                    {
+                        AnstallningsId = reader.GetInt32(reader.GetOrdinal("AnstallningsId")),
+                        Behorighet = reader.GetInt32(reader.GetOrdinal("Behorighet")),
+                        Fornamn = reader.GetString(reader.GetOrdinal("Fornamn")),
+                        Efternamn = reader.GetString(reader.GetOrdinal("Efternamn"))
+                    };
+                    result.Add(station);
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
-                return false;
+                return result;
             }
-            return true;
+            return result;
         }
 
-        public static async Task<bool> QueryPersonalScalar(int anstId)
+        public static async Task<bool> QueryPersonalScalar(int anstId, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -772,8 +1050,17 @@ namespace D0004N
 
         // ============= KONTROLL =================
 
-        public static async Task<bool> NonQueryKontroll(string regNr, int bokId, int anstId, int matarSt)
+        public static async Task<bool> NonQueryKontroll(string regNr, int bokId, int anstId, int matarSt, int user)
         {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             try
             {
                 using var conn = new SqlConnection(DB);
@@ -800,8 +1087,48 @@ namespace D0004N
             }
         }
 
-        public static async Task<int> NonQuerySkada(string regNr, int bokId, DateTime? dtFixd, string? desc)
+        public static async Task<int> QueryBilarUtanKontroll(int bokningsId, string regNr, int user)
         {
+            string DB = (user == 0) ? ConnectionStringKontroll : ConnectionStringAvtal;
+            int count = 0;
+
+            try
+            {
+                using var conn = new SqlConnection(DB);
+                await conn.OpenAsync();
+
+                string sql = @"
+                            SELECT COUNT(*) 
+                            FROM Kontroll
+                             WHERE BokningsId = @BID 
+                            AND RegNr = @Reg
+                            ";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@BID", bokningsId);
+                cmd.Parameters.AddWithValue("@Reg", regNr);
+
+                count = (int)await cmd.ExecuteScalarAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return count;
+        }
+
+
+        public static async Task<int> NonQuerySkada(string regNr, int bokId, DateTime? dtFixd, string? desc, int user)
+        {
+            string DB = "";
+            if (user == 0)
+            {
+                DB = ConnectionStringKontroll;
+            }
+            else
+            {
+                DB = ConnectionStringAvtal;
+            }
             int lastId = 0;
             try
             {

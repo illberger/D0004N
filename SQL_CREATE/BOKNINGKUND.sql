@@ -1,7 +1,7 @@
 USE [D0004N]
 GO
 
-/****** Object:  Table [dbo].[BokningKund]    Script Date: 2025-03-12 13:45:21 ******/
+/****** Object:  Table [dbo].[BokningKund]    Script Date: 2025-03-17 18:35:50 ******/
 SET ANSI_NULLS ON
 GO
 

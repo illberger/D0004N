@@ -1,7 +1,7 @@
 USE [D0004N]
 GO
 
-/****** Object:  Table [dbo].[BilTyp]    Script Date: 2025-03-12 14:43:28 ******/
+/****** Object:  Table [dbo].[BilTyp]    Script Date: 2025-03-17 18:36:23 ******/
 SET ANSI_NULLS ON
 GO
 

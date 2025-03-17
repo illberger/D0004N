@@ -28,6 +28,14 @@ namespace D0004N
             public DateTime? SlutDatum { get; set; }
         }
 
+        public class Personal
+        {
+            public int AnstallningsId { get; set; }
+            public int Behorighet { get; set; }
+            public string Fornamn { get; set; }
+            public string Efternamn { get; set; }
+        }
+
         public class BiltypDto
         {
             public int BilTypId { get; set; }
@@ -43,6 +51,14 @@ namespace D0004N
 
         public class BokningBilDto
         {
+            public string RegNr { get; set; }
+            public DateTime StartDatum { get; set; }
+            public DateTime? SlutDatum { get; set; }
+        }
+
+        public class BokningBil
+        {
+            public int BokningsId { get; set; }
             public string RegNr { get; set; }
             public DateTime StartDatum { get; set; }
             public DateTime? SlutDatum { get; set; }

@@ -1,7 +1,6 @@
 # D0004N Datamodellering - Uppgift 1
-Elias Töyrä <br>
 En simpel SQL-klient som stödjer hela den logiska datamodellen.<br><br>
-Här i programmet görs alla bokningar från <b>appmaskinens systemtid -> ett givet slutdatum (eller oändligt.)</b> Den förutsätter även att det inte finns diskrepanser mellan appmaskinen och db-maskinens systemtider. När diffen mellan två tider beräknas används DB-maskinens nuvarande systemtid. 
+Se till att sätta upp samtliga tables och kör sedan <b>USER_RESTRICTIONS.sql</b> för att lägga till restriktioner etc. <b>PERSONAL.sql</b> skapar två poster med olika rättigheter.
 <br><br>
 Inga funktioner för extern fillagring och skapning har implementerats (samtliga <b>Filepath</b> är nullable).
 

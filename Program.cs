@@ -2,6 +2,7 @@ using System.Data.SqlClient;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using static D0004N.Schema;
 
 namespace D0004N
 {
@@ -14,57 +15,109 @@ namespace D0004N
     {
         public static async Task Main(string[] args)
         {
-            await Meny();
-            Console.WriteLine("Tryck på valfri knapp för att avsluta...");
-            Console.ReadKey();
+
+            while (true) { 
+                int behorighet = await Login();
+                if (behorighet < 0 || behorighet > 1)
+                {
+                    Console.WriteLine("Inloggningen misslyckades. Avslutar...");
+                    Console.ReadKey();
+                    return;
+                }
+
+                await Meny(behorighet);
+                Console.WriteLine("Vill du Avsluta (J/N)?");
+                var input = Console.ReadLine()?.Trim().ToLower();
+                bool yes = input == "j";
+                if (yes) break;
+            }   
         }
 
+
+        private static async Task<int> Login()
+        {
+            var allPersonal = await Transactor.QueryAllPersonal();
+            if (allPersonal == null || allPersonal.Count == 0)
+            {
+                Console.WriteLine("Inga poster i tabellen [Anstalld]. Går ej att logga in.");
+                return -1;
+            }
+
+            Console.WriteLine("Välj vilken användare du vill logga in som:");
+            Console.WriteLine("AnstallningsId | Behorighet | Fornamn      | Efternamn");
+            Console.WriteLine("-----------------------------------------------------");
+            foreach (var p in allPersonal)
+            {
+                Console.WriteLine($"{p.AnstallningsId}            | {p.Behorighet}           | {p.Fornamn,-12} | {p.Efternamn}");
+            }
+
+            Console.Write("\nAnge AnstallningsId för inloggning: ");
+            var input = Console.ReadLine()?.Trim();
+            if (!int.TryParse(input, out int anstId))
+            {
+                Console.WriteLine("Felaktig inmatning.");
+                return -1;
+            }
+
+            var chosen = allPersonal.Find(x => x.AnstallningsId == anstId);
+            if (chosen == null)
+            {
+                Console.WriteLine("Ingen personal med det id:t.");
+                return -1;
+            }
+
+            return chosen.Behorighet;
+        }
+
+
+
+
+
         /// <summary>
-        /// Steg 1 - 3 krävs för att hyra en bil, men constraints kan ju dubbelkollas innan detta etc genom att hyra en bil.
+        /// 
         /// </summary>
         /// <returns></returns>
-        private static async Task Meny()
+        private static async Task Meny(int behorighet)
         {
             while (true)
             {
                 Console.Clear();
                 Console.WriteLine("Green Rental DB - Huvudmeny");
-                Console.WriteLine("Kontroller och skador kan inte postas om en bil har ett slutdatum. I det scenariot skapas en faktura preliminärt.");
-                Console.WriteLine("1. Registrera bil");
-                Console.WriteLine("2. Registrera station");
-                Console.WriteLine("3. Registrera Personal");
-                Console.WriteLine("4. Visa alla bilar + status");
-                Console.WriteLine("5. Visa stationer");
-                Console.WriteLine("6. Hyr ut Bil");
-                Console.WriteLine("7. Inlämning av bil samt skadekontroll.");
-                Console.WriteLine("q. Avsluta\n");
+                Console.WriteLine($"Inloggad med behörighet: {behorighet}");
+                Console.WriteLine("1. Registrera bil (Behörighet 1++)"); // Insert till Bilstation och Bil
+                Console.WriteLine("2. Registrera station (Behörighet 1++)"); // Insert till Station
+                Console.WriteLine("3. Visa alla bilar + status (Behörighet 0++)"); // Select från BilStation + BokningBil
+                Console.WriteLine("4. Visa stationer (Behörighet 0++)"); // Select från Station
+                Console.WriteLine("5. Hyr ut Bil (Behörighet 1++)"); // Skriva avtal samt eventuell registrera kunduppgifter
+                Console.WriteLine("6. Inlämning av bil (Behörighet 1++)."); // En update till BokningBil
+                Console.WriteLine("7. Gör skadekontroll av inlämnad bil (Behörighet 0++)."); // En Insert till Kontroll samt eventuellt Skada
+                Console.WriteLine("q. 'Logga ut'\n");
 
                 var input = Console.ReadLine()?.Trim();
 
                 switch (input)
                 {
                     case "1":
-                        await RegistreraBil();
+                        await RegistreraBil(behorighet);
                         break;
                     case "2":
-                        await RegistreraStation();
+                        await RegistreraStation(behorighet);
                         break;
                     case "3":
-                        await RegistreraPersonal();
+                        await VisaAllaBilarMedStatus(behorighet);
                         break;
                     case "4":
-                        await VisaAllaBilarMedStatus();
+                        await VisaStationer(behorighet);
                         break;
                     case "5":
-                        await VisaStationer();
+                        await BokaHyrning(behorighet); ;
                         break;
                     case "6":
-                        await BokaHyrning();
+                        await AvslutaHyrning(behorighet);
                         break;
                     case "7":
-                        await AvslutaHyrning();
+                        await SkadeKontroll(behorighet);
                         break;
-
                     case "q":
                         return;
                     default:
@@ -79,7 +132,7 @@ namespace D0004N
         /// strikt enligt denna modell
         /// </summary>
         /// <returns></returns>
-        private static async Task RegistreraStation()
+        private static async Task RegistreraStation(int behorighet)
         {
             Console.WriteLine("Registrera station.\n");
             Console.Write("StationId: ");
@@ -94,7 +147,7 @@ namespace D0004N
             Console.Write("Adress: ");
             var adress = Console.ReadLine() ?? "";
 
-            var success = await Transactor.NonQueryStation(stationId, adress);
+            var success = await Transactor.NonQueryStation(stationId, adress, behorighet);
             if (!success)
             {
                 Console.WriteLine("Fel vid registrering av station (INSERT).");
@@ -106,9 +159,9 @@ namespace D0004N
             Console.ReadKey();
         }
 
-        private static async Task VisaStationer()
+        private static async Task VisaStationer(int behorighet)
         {
-            var stationer = await Transactor.QueryStation();
+            var stationer = await Transactor.QueryStation(behorighet);
             if (stationer == null || stationer.Count == 0)
             {
                 Console.WriteLine("Inga stationer hittades i databasen.");
@@ -130,7 +183,7 @@ namespace D0004N
         /// <summary>
         /// Registrera av en bil.
         /// </summary>
-        private static async Task RegistreraBil()
+        private static async Task RegistreraBil(int behorighet)
         {
             Console.WriteLine("Registrera bil.\n");
 
@@ -155,7 +208,7 @@ namespace D0004N
                 return;
             }
 
-            var bilTypReturn = await Transactor.QueryBilTyp(bilTyp);
+            var bilTypReturn = await Transactor.QueryBilTyp(bilTyp, behorighet);
 
             if (!bilTypReturn) // "< 0 av "bilTyp" i dbo.BilTyp"
             {
@@ -173,7 +226,7 @@ namespace D0004N
                     return;
                 }
 
-                bool nonQuerySuccess = await Transactor.NonQueryBilTyp(bilTyp, krDygn);
+                bool nonQuerySuccess = await Transactor.NonQueryBilTyp(bilTyp, krDygn, behorighet);
                 if (!nonQuerySuccess)
                 {
                     Console.WriteLine("Fel vid transakation till BilTyp");
@@ -183,7 +236,7 @@ namespace D0004N
                 // Biltyp är nu skapad 
             }
 
-            var successStation = await Transactor.NonQueryBilStation(regNr, stationId);
+            var successStation = await Transactor.NonQueryBilStation(regNr, stationId, behorighet);
             if (!successStation)
             {
                 Console.WriteLine("Fel vid registrering av BilStation (INSERT).");
@@ -191,7 +244,7 @@ namespace D0004N
                 return;
             }
 
-            var successBil = await Transactor.NonQueryBil(regNr, bilTyp);
+            var successBil = await Transactor.NonQueryBil(regNr, bilTyp, behorighet);
             if (!successBil)
             {
                 Console.WriteLine("Fel vid registrering av bil (INSERT).");
@@ -204,42 +257,13 @@ namespace D0004N
         }
 
 
-        private static async Task RegistreraPersonal()
-        {
-            Console.WriteLine("Registrera ny personal.");
-
-            Console.Write("AnställningsId (heltal): ");
-            var idStr = Console.ReadLine() ?? "";
-            if (!int.TryParse(idStr, out int anstId))
-            {
-                Console.WriteLine("Felaktigt inmatning av AnställningsId.");
-                Console.ReadKey();
-                return;
-            }
-
-            Console.Write("Förnamn: ");
-            var fNamn = Console.ReadLine() ?? "";
-            Console.Write("Efternamn: ");
-            var eNamn = Console.ReadLine() ?? "";
-
-            var success = await Transactor.NonQueryPersonal(anstId, fNamn, eNamn);
-            if (!success)
-            {
-                Console.WriteLine("Fel vid registrering av personal.");
-                Console.ReadKey();
-                return;
-            }
-            Console.WriteLine("Personal registrerad!");
-            Console.ReadKey();
-        }
-
 
         /// <summary>
         /// Enkel variant
         /// </summary>
-        private static async Task VisaAllaBilarMedStatus()
+        private static async Task VisaAllaBilarMedStatus(int behorighet)
         {
-            var bilLista = await Transactor.QueryBilWithStatus();
+            var bilLista = await Transactor.QueryBilWithStatus(behorighet);
             if (bilLista == null || bilLista.Count == 0)
             {
                 Console.WriteLine("Inga bilar hittades i databasen.");
@@ -260,7 +284,7 @@ namespace D0004N
         /// <summary>
         /// <b>Boka en bil.</b>
         /// </summary>
-        private static async Task BokaHyrning()
+        private static async Task BokaHyrning(int behorighet)
         {
             Console.WriteLine("Är det en företagskund? (J/N):");
             var input = Console.ReadLine()?.Trim().ToLower();
@@ -276,10 +300,10 @@ namespace D0004N
                 Console.Write("Företagsadress: ");
                 var fAdress = Console.ReadLine() ?? "";
 
-                var foretagExists = await Transactor.CheckIfForetagExists(orgNr);
+                var foretagExists = await Transactor.CheckIfForetagExists(orgNr, behorighet);
                 if (!foretagExists)
                 {
-                    var createdF = await Transactor.NonQueryForetag(orgNr, fNamn, fAdress);
+                    var createdF = await Transactor.NonQueryForetag(orgNr, fNamn, fAdress, behorighet);
                     if (!createdF)
                     {
                         Console.WriteLine("Fel vid registrering av Företag.");
@@ -291,21 +315,21 @@ namespace D0004N
                 Console.Write("Kontaktpersonens personnummer: ");
                 var pnr = Console.ReadLine() ?? "";
 
-                var kundExists = await Transactor.CheckIfKundExists(pnr);
+                var kundExists = await Transactor.CheckIfKundExists(pnr, behorighet);
                 if (!kundExists)
                 {
                     Console.Write("Kontaktpersonens förnamn: ");
                     var kFnamn = Console.ReadLine() ?? "";
                     Console.Write("Kontaktpersonens efternamn: ");
                     var kEnamn = Console.ReadLine() ?? "";
-                    var createdKund = await Transactor.NonQueryKund(kFnamn, kEnamn, pnr, orgNr);
+                    var createdKund = await Transactor.NonQueryKund(kFnamn, kEnamn, pnr, orgNr, behorighet);
                     if (!createdKund)
                     {
                         Console.WriteLine("Fel vid registrering av kund.");
                         Console.ReadKey();
                         return;
                     }
-                    kundId = await Transactor.NonQueryKunder(pnr); // --------- Skapa KundId -> INSERT
+                    kundId = await Transactor.NonQueryKunder(pnr, behorighet); // --------- Skapa KundId -> INSERT
                     if (kundId <= 0)
                     {
                         Console.WriteLine("Fel vid skapande av Kunder-rad.");
@@ -314,12 +338,12 @@ namespace D0004N
                     }
                 } else
                 {
-                    kundId = await Transactor.QueryKunder(pnr);
+                    kundId = await Transactor.QueryKunder(pnr, behorighet);
                 }
 
                 
 
-                int bokId = await SkapaBokning(kundId); // ------ Skapa BoKId -> Insert
+                int bokId = await SkapaBokning(kundId, behorighet); // ------ Skapa BoKId -> Insert
 
                 if (bokId <= 0)
                 {
@@ -340,28 +364,28 @@ namespace D0004N
                     return;
                 }
 
-                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null);
+                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null, behorighet);
                 Console.WriteLine(avtalOk ? "Avtal signerat." : "Fel vid avtalssignering.");
             }
             else
             {
                 Console.Write("Personnummer: ");
                 var pnr = Console.ReadLine() ?? "";
-                var kundExists = await Transactor.CheckIfKundExists(pnr);
+                var kundExists = await Transactor.CheckIfKundExists(pnr, behorighet);
                 if (!kundExists)
                 {
                     Console.Write("Förnamn: ");
                     var fNamn = Console.ReadLine() ?? "";
                     Console.Write("Efternamn: ");
                     var eNamn = Console.ReadLine() ?? "";
-                    var createdKund = await Transactor.NonQueryKund(fNamn, eNamn, pnr, null);
+                    var createdKund = await Transactor.NonQueryKund(fNamn, eNamn, pnr, null, behorighet);
                     if (!createdKund)
                     {
                         Console.WriteLine("Fel vid registrering av kund.");
                         Console.ReadKey();
                         return;
                     }
-                    kundId = await Transactor.NonQueryKunder(pnr);
+                    kundId = await Transactor.NonQueryKunder(pnr, behorighet);
                     if (kundId <= 0)
                     {
                         Console.WriteLine("Fel vid skapande av Kunder-rad.");
@@ -371,12 +395,12 @@ namespace D0004N
                 }
                 else
                 {
-                    kundId = await Transactor.QueryKunder(pnr);
+                    kundId = await Transactor.QueryKunder(pnr, behorighet);
                 }
 
 
 
-                int bokId = await SkapaBokning(kundId);
+                int bokId = await SkapaBokning(kundId, behorighet);
 
                 if (bokId <= 0)
                 {
@@ -394,7 +418,7 @@ namespace D0004N
                     return;
                 }
 
-                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null);
+                var avtalOk = await Transactor.NonQueryAvtal(anstallningsId, bokId, true, null, behorighet);
                 Console.WriteLine(avtalOk ? "Avtal signerat." : "Fel vid avtalssignering.");
                 Console.ReadKey();
             }
@@ -404,10 +428,10 @@ namespace D0004N
         /// Ny Bokning Agnostic.
         /// </summary>
         /// <returns>Boknings ID:t</returns>
-        private static async Task<int> SkapaBokning(int kundId)
+        private static async Task<int> SkapaBokning(int kundId, int behorighet)
         {
 
-            int bokId = await Transactor.NonQueryBokningKund(kundId);
+            int bokId = await Transactor.NonQueryBokningKund(kundId, behorighet);
             if (bokId <= 0)
             {
                 Console.WriteLine("Kunde ej skapa Bokning i BokningKund.");
@@ -443,7 +467,7 @@ namespace D0004N
                 var reg = Console.ReadLine()?.Trim();
                 if (string.IsNullOrEmpty(reg)) break;
 
-                bool avbl = await Transactor.QueryRegNrWithStatus(reg);
+                bool avbl = await Transactor.QueryRegNrWithStatus(reg, behorighet);
                 if (!avbl)
                 {
                     Console.WriteLine($"Bil {reg} är inte tillgänglig just nu.");
@@ -463,7 +487,7 @@ namespace D0004N
 
 
 
-            bool success = await Transactor.NonQueryBokningBil(regNrList, bokId, start, slutdatum);
+            bool success = await Transactor.NonQueryBokningBil(regNrList, bokId, start, slutdatum, behorighet);
             if (!success)
             {
                 Console.WriteLine("Fel vid skapande av poster i BokningBil.");
@@ -477,7 +501,7 @@ namespace D0004N
                 decimal belopp = 0;
                 foreach (string reg in regNrList)
                 {
-                    var bilInfo = await Transactor.QueryBiltypByRegNr(reg);
+                    var bilInfo = await Transactor.QueryBiltypByRegNr(reg, behorighet);
                     if (bilInfo == null)
                     {
                         Console.WriteLine("Kunde inte hitta Biltyp-info för bil: " + reg);
@@ -502,7 +526,7 @@ namespace D0004N
                         tempDate = tempDate.AddDays(1);
                     }
                 }
-                bool facturaSuccess = await SkapaFaktura(bokId, belopp);
+                bool facturaSuccess = await SkapaFaktura(bokId, belopp, behorighet);
                 if (!facturaSuccess) return -1;
             }
 
@@ -530,13 +554,13 @@ namespace D0004N
         /// <b>Agnostic Faktura NonQuery.</b><br></br>
         /// Skapa en enkel faktura för en bokning.
         /// </summary>
-        private static async Task<bool> SkapaFaktura(int bokningsId, decimal belopp)
+        private static async Task<bool> SkapaFaktura(int bokningsId, decimal belopp, int behorighet)
         {
             var fakturaId = DateTime.Now.ToBinary(); // -2^64 i nutid
             DateTime datum = DateTime.Now;
             DateTime forfDatum = datum.AddDays(30);
             bool status = false;
-            var success = await Transactor.NonQueryFaktura(fakturaId, bokningsId, belopp, datum, forfDatum, status);
+            var success = await Transactor.NonQueryFaktura(fakturaId, bokningsId, belopp, datum, forfDatum, status, behorighet);
             Console.WriteLine(success ? $"Skapade faktura med beloppet: {belopp}" : "Fel vid skapande av faktura.");
             Console.ReadKey();
             return success;
@@ -546,14 +570,17 @@ namespace D0004N
         /// Uppdatera en eller flera poster i <b>BokningBil</b> som inte har ett slutDatum.
         /// </summary>
         /// <returns></returns>
-        private static async Task AvslutaHyrning()
+        private static async Task AvslutaHyrning(int behorighet)
         {
-            var kunderObject = await Transactor.QueryAllKunder();
+            var kunderObject = await Transactor.QueryAllKunder(behorighet);
             Console.WriteLine("Registrerade kunder:\n");
 
             foreach (var kunder in kunderObject)
             {
-                Console.WriteLine($"KundId: {kunder.KundId}, Pnr: {kunder.Personnummer}\n");
+                if (kunder != null)
+                {
+                    Console.WriteLine($"KundId: {kunder.KundId}, Pnr: {kunder.Personnummer}\n");
+                }
             }
             Console.Write("Ange KundID: ");
             var kundIdStr = Console.ReadLine() ?? "";
@@ -564,7 +591,7 @@ namespace D0004N
                 return;
             }
 
-            var bokningsList = await Transactor.QueryBokningarForKund(kundId);
+            var bokningsList = await Transactor.QueryBokningarForKund(kundId, behorighet);
             if (bokningsList == null || bokningsList.Count == 0)
             {
                 Console.WriteLine("Hittade inga bokningar för KundID = " + kundId);
@@ -587,7 +614,7 @@ namespace D0004N
                 return;
             }
 
-            var bokningBilList = await Transactor.QueryBokningBil(bokId);
+            var bokningBilList = await Transactor.QueryBokningBil(bokId, behorighet);
             if (bokningBilList == null || bokningBilList.Count == 0)
             {
                 Console.WriteLine("Ingen bil hittades för BokningsId = " + bokId);
@@ -653,7 +680,7 @@ namespace D0004N
                     continue;
                 }
                 DateTime start = row.StartDatum;
-                var bilInfo = await Transactor.QueryBiltypByRegNr(regNr);
+                var bilInfo = await Transactor.QueryBiltypByRegNr(regNr, behorighet);
                 if (bilInfo == null)
                 {
                     Console.WriteLine($"Kunde inte hämta Biltyp för {regNr} - hoppar över.");
@@ -676,7 +703,7 @@ namespace D0004N
                 totalBelopp += belopp;
             }
 
-            bool updateOk = await Transactor.UpdateSlutDatum(bokId, regNrToClose, newSlut);
+            bool updateOk = await Transactor.UpdateSlutDatum(bokId, regNrToClose, newSlut, behorighet);
             if (!updateOk)
             {
                 Console.WriteLine("Fel vid uppdatering av slutdatum.");
@@ -684,71 +711,14 @@ namespace D0004N
                 return;
             }
 
-            Console.WriteLine("Bilar inlämnade. Utför kontroll av samtliga bilar (J/N)?");
-
-
-            // ========= Skadekontroll ============
-            var kontr = Console.ReadLine()?.Trim().ToLower();
-            bool doKontr = (kontr == "j");
-            if (doKontr)
-            {
-                Console.WriteLine("Ange AnställningsId(int) för att utföra kontroll: ");
-                var anstIdInput = Console.ReadLine();
-                if (int.TryParse(anstIdInput, out int AnstId))
-                {
-                    bool anstExists = await Transactor.QueryPersonalScalar(AnstId);
-                    if (anstExists)
-                    {
-                        foreach (string reg in regNrToClose) // BokningBil  1:0..M  Kontroll
-                        {
-                            Console.Clear();
-                            Console.WriteLine($"Bil {reg}");
-                            Console.WriteLine("Skriv upp bilens mätarställning(int): ");
-                            var matarInput = Console.ReadLine().Trim();
-                            if (!int.TryParse(matarInput, out var matarst))
-                            {
-                                Console.WriteLine("Felaktig inmatning, klicka för att fortsätta.");
-                                Console.ReadKey();
-                                continue;
-                            }
-
-                            bool sxKntrQry = await Transactor.NonQueryKontroll(reg, bokId, AnstId, matarst);
-                            if (!sxKntrQry) continue;
-
-                            Console.WriteLine("Skriv in antal(int) skador: ");
-                            var skdInput = Console.ReadLine().Trim();
-                            if(!int.TryParse(skdInput, out var skd))
-                            {
-                                Console.WriteLine("Du angav 0 skador.");
-                                Console.ReadKey(); continue;
-                            }
-                            Console.WriteLine($"Du angav {skd} skador.");
-                            for (int i = 0; i < skd; i++) // Kontroll  1:0..M  Skada
-                            {
-                                int skdId = await Transactor.NonQuerySkada(reg, bokId, null, null);
-                                Console.WriteLine($"Skapade ID {skdId} för skada {reg}.");
-                            }
-                            Console.WriteLine("Klicka för att fortsätta.");
-                            Console.ReadKey();
-                        }
-                    } else
-                    {
-                        Console.WriteLine($"AnställningsID:t {AnstId} kunde ej hittas i databasen. Klicka för att fortsätta till fakturering för bilar.");
-                        Console.ReadKey();
-                    }
-                    Console.Clear();
-                }
-            }
-
-
             if (totalBelopp > 0)
             {
                 Console.WriteLine($"Totalt belopp att faktureras: {totalBelopp}");
-                bool facturaSuccess = await SkapaFaktura(bokId, totalBelopp);
+                bool facturaSuccess = await SkapaFaktura(bokId, totalBelopp, behorighet);
                 if (!facturaSuccess)
                 {
                     Console.WriteLine("Återställer bokning...");
-                    bool reUpdateOk = await Transactor.UpdateSlutDatum(bokId, regNrToClose, null);
+                    bool reUpdateOk = await Transactor.UpdateSlutDatum(bokId, regNrToClose, null, behorighet);
                     if (!reUpdateOk)
                     {
                         Console.WriteLine("Allting sket sig totalt, återgår till huvudmenyn...");
@@ -764,6 +734,81 @@ namespace D0004N
             }
 
             Console.WriteLine("Återgå till huvudmeny (click)");
+            Console.ReadKey();
+        }
+
+
+
+        public static async Task SkadeKontroll(int behorighet)
+        {
+ 
+             List<BokningBil> bokningBilList = new List<BokningBil>();
+             bokningBilList = await Transactor.QueryAllBokningBil(behorighet);
+
+             if (bokningBilList == null || bokningBilList.Count == 0)
+             {
+                 Console.WriteLine("Inga bilar funna i BokningBil.");
+                 Console.ReadKey();
+                 return;
+             }
+            
+
+            var bilarUtanKontroll = new List<(int BokningsId, string Reg)>();
+
+            foreach (var row in bokningBilList)
+            {
+                int count = await Transactor.QueryBilarUtanKontroll(row.BokningsId, row.RegNr, behorighet);
+                if (count == 0)
+                {
+                    bilarUtanKontroll.Add((row.BokningsId, row.RegNr));
+                }
+            }
+
+            if (bilarUtanKontroll.Count == 0)
+            {
+                Console.WriteLine("Alla bilar i vald del av systemet har redan kontrollposter.");
+                Console.ReadKey();
+                return;
+            }
+            foreach (var (bokId, reg) in bilarUtanKontroll)
+            {
+                Console.Clear();
+                Console.WriteLine($"Bil {reg}, Bokning {bokId} saknar kontroll.");
+                Console.Write("Ange mätarställning: ");
+                var input = Console.ReadLine()?.Trim();
+                if (!int.TryParse(input, out int matar))
+                {
+                    Console.WriteLine("Felaktig inmatning, avbryter denna bil.");
+                    Console.ReadKey();
+                    continue;
+                }
+
+                bool kontrollOk = await Transactor.NonQueryKontroll(reg, bokId, 0, matar, behorighet);
+                if (!kontrollOk)
+                {
+                    Console.WriteLine("Fel vid insättning av kontroll.");
+                    Console.ReadKey();
+                    continue;
+                }
+
+                Console.Write("Hur många skador vill du registrera? ");
+                var skdInput = Console.ReadLine()?.Trim();
+                if (!int.TryParse(skdInput, out int antalSkador))
+                {
+                    Console.WriteLine("Felaktig inmatning. Ingen skada registreras.");
+                    Console.ReadKey();
+                    continue;
+                }
+                for (int i = 0; i < antalSkador; i++)
+                {
+                    int skadaId = await Transactor.NonQuerySkada(reg, bokId, null, null, behorighet);
+                    Console.WriteLine($"Skada nr {skadaId} insatt för bil {reg}.");
+                }
+                Console.WriteLine("Klicka för att fortsätta.");
+                Console.ReadKey();
+            }
+
+            Console.WriteLine("Klart! Återgå till menyn...");
             Console.ReadKey();
         }
     }

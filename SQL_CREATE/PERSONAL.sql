@@ -1,7 +1,7 @@
 USE [D0004N]
 GO
 
-/****** Object:  Table [dbo].[Anstalld]    Script Date: 2025-03-12 13:43:54 ******/
+/****** Object:  Table [dbo].[Anstalld]    Script Date: 2025-03-17 15:42:52 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -10,6 +10,7 @@ GO
 
 CREATE TABLE [dbo].[Anstalld](
 	[AnstallningsId] [int] NOT NULL,
+	[Behorighet] [int] NOT NULL,
 	[Fornamn] [nvarchar](50) NOT NULL,
 	[Efternamn] [nvarchar](50) NOT NULL,
  CONSTRAINT [PK_Anstalld] PRIMARY KEY CLUSTERED 
@@ -19,3 +20,9 @@ CREATE TABLE [dbo].[Anstalld](
 ) ON [PRIMARY]
 GO
 
+INSERT INTO [dbo].[Anstalld] 
+    (AnstallningsId, Behorighet, Fornamn, Efternamn)
+VALUES
+    (0, 0, 'UnderHåll', 'Persson'),  -- UnderHåll = behörighet 0
+    (1, 1, 'Uthyrning', 'Jansson');  -- Uthyrning = behörighet 1
+GO

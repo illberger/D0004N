@@ -1,7 +1,7 @@
 USE [D0004N]
 GO
 
-/****** Object:  Table [dbo].[Skada]    Script Date: 2025-03-12 13:46:34 ******/
+/****** Object:  Table [dbo].[Skada]    Script Date: 2025-03-17 18:34:47 ******/
 SET ANSI_NULLS ON
 GO
 
